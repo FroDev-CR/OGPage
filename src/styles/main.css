@@ -1,0 +1,108 @@
+:root {
+  --primary-color: #2A2E35;
+  --accent-color: #C5A47E;
+  --transition-speed: 0.3s;
+}
+
+.section {
+  padding: 8rem 0;
+}
+
+.section-title {
+  font-size: 2.5rem;
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin-bottom: 4rem;
+  position: relative;
+  color: var(--primary-color);
+}
+
+.section-title:after {
+  content: '';
+  position: absolute;
+  bottom: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 2px;
+  background: var(--accent-color);
+}
+
+.product-card {
+  transition: all var(--transition-speed) ease;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.product-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+}
+
+.nav-hover {
+  position: relative;
+  padding: 5px 0;
+}
+
+.nav-hover:after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--accent-color);
+  transition: width var(--transition-speed) ease;
+}
+
+.nav-hover:hover:after {
+  width: 100%;
+
+  .rbc-calendar {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+  }
+
+  .rbc-header {
+    background: #2A2E35;
+    color: white;
+    padding: 10px 0;
+  }
+
+  /* Admin Panel */
+.admin-panel .card {
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.admin-panel .card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.auth-box {
+  background: white;
+  max-width: 400px;
+  width: 100%;
+}
+
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+/* Modal de edición */
+.modal-content {
+  border-radius: 15px;
+}
+
+.modal-header {
+  border-bottom: none;
+  padding: 1.5rem;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+}
