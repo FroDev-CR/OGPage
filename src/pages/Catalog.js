@@ -14,16 +14,20 @@ const Catalog = () => {
         const querySnapshot = await getDocs(collection(db, "products"));
         const productsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          name: doc.data().name || 'Producto sin nombre',
+          description: doc.data().description || 'Descripción no disponible',
+          price: doc.data().price || 0,
+          image: doc.data().image || 'https://via.placeholder.com/300x300',
+          category: doc.data().category || 'Sin categoría'
         }));
         setProducts(productsData);
-        setLoading(false);
       } catch (error) {
-        console.error("Error fetching products:", error);
+        console.error("Error cargando productos:", error);
+      } finally {
         setLoading(false);
       }
     };
-
+  
     fetchProducts();
   }, []);
 

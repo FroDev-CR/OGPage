@@ -4,7 +4,7 @@ import Home from './pages/Home';
 import Catalog from './pages/Catalog';
 import Footer from './components/Footer';
 import AdminPanel from './pages/AdminPanel';
-import EventCalendar from './components/EventCalendar'; // Asegurar que este archivo exista
+import LivePage from './pages/LivePage';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles/main.css';
 
@@ -15,8 +15,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/catalogo" element={<Catalog />} />
-        <Route path="/calendario" element={<EventCalendar />} />
         <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/live" element={<LivePage />} />
       </Routes>
       <Footer />
     </Router>

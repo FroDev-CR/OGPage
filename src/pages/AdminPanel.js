@@ -3,8 +3,6 @@ import { Container, Tabs, Tab, Form, Button, Alert, Modal, Row, Col } from 'reac
 import { db } from '../firebase';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../firebase';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -13,15 +11,26 @@ const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState('events');
   const [events, setEvents] = useState([]);
   const [products, setProducts] = useState([]);
+  const [streams, setStreams] = useState([]); // Nuevo estado para streams
   const [formData, setFormData] = useState({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
-  const [uploading, setUploading] = useState(false);
 
   // Configuración inicial
   const collections = {
+    streams: {
+      fields: ['title', 'youtubeUrl', 'scheduledTime', 'description', 'isLive'],
+      labels: {
+        title: 'Título del Stream*',
+        youtubeUrl: 'URL de YouTube*',
+        scheduledTime: 'Fecha y Hora*',
+        description: 'Descripción',
+        isLive: 'En Vivo'
+      },
+      required: ['title', 'youtubeUrl', 'scheduledTime']
+    },
     events: {
       fields: ['title', 'date', 'description', 'price', 'image'],
       labels: {
@@ -29,9 +38,9 @@ const AdminPanel = () => {
         date: 'Fecha y Hora*',
         description: 'Descripción',
         price: 'Precio de Inscripción*',
-        image: 'Imagen Promocional'
+        image: 'URL de la Imagen*'
       },
-      required: ['title', 'date', 'price']
+      required: ['title', 'date', 'price', 'image']
     },
     products: {
       fields: ['name', 'description', 'price', 'image', 'category'],
@@ -39,10 +48,10 @@ const AdminPanel = () => {
         name: 'Nombre del Producto*',
         description: 'Descripción',
         price: 'Precio*',
-        image: 'Imagen del Producto',
+        image: 'URL de la Imagen*',
         category: 'Categoría'
       },
-      required: ['name', 'price']
+      required: ['name', 'price', 'image']
     }
   };
 
@@ -51,6 +60,7 @@ const AdminPanel = () => {
     if (user) {
       const fetchData = async () => {
         try {
+          // Cargar eventos
           const eventsCol = collection(db, 'events');
           const eventsSnapshot = await getDocs(eventsCol);
           setEvents(eventsSnapshot.docs.map(d => ({
@@ -62,6 +72,7 @@ const AdminPanel = () => {
             image: d.data().image || ''
           })));
 
+          // Cargar productos
           const productsCol = collection(db, 'products');
           const productsSnapshot = await getDocs(productsCol);
           setProducts(productsSnapshot.docs.map(d => ({
@@ -72,6 +83,18 @@ const AdminPanel = () => {
             image: d.data().image || '',
             category: d.data().category || 'Sin categoría'
           })));
+
+          // Cargar streams
+          const streamsCol = collection(db, 'streams');
+          const streamsSnapshot = await getDocs(streamsCol);
+          setStreams(streamsSnapshot.docs.map(d => ({
+            id: d.id,
+            title: d.data().title || 'Sin título',
+            youtubeUrl: d.data().youtubeUrl || '',
+            scheduledTime: d.data().scheduledTime?.toDate() || new Date(),
+            description: d.data().description || '',
+            isLive: d.data().isLive || false
+          })));
         } catch (error) {
           setError('Error cargando datos');
         }
@@ -80,19 +103,13 @@ const AdminPanel = () => {
     }
   }, [user]);
 
-  // Subir imagen a Storage
-  const uploadImage = async (file) => {
+  // Validar URL
+  const isValidUrl = (url) => {
     try {
-      setUploading(true);
-      const storageRef = ref(storage, `images/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      setUploading(false);
-      return url;
-    } catch (err) {
-      setError('Error subiendo imagen');
-      setUploading(false);
-      return null;
+      new URL(url);
+      return true;
+    } catch {
+      return false;
     }
   };
 
@@ -106,18 +123,16 @@ const AdminPanel = () => {
         throw new Error(`Campos requeridos faltantes: ${missingFields.join(', ')}`);
       }
 
-      // Subir imagen si existe
-      let imageUrl = formData.image;
-      if (formData.imageFile) {
-        imageUrl = await uploadImage(formData.imageFile);
-        if (!imageUrl) throw new Error('Error subiendo imagen');
+      // Validar URL de YouTube
+      if (type === 'streams' && !isValidUrl(formData.youtubeUrl)) {
+        throw new Error('La URL de YouTube no es válida');
       }
 
       // Crear o actualizar
       const dataToSave = {
         ...formData,
-        image: imageUrl,
-        ...(type === 'events' && { date: formData.date || new Date() })
+        ...(type === 'events' && { date: formData.date || new Date() }),
+        ...(type === 'streams' && { scheduledTime: formData.scheduledTime || new Date() })
       };
 
       if (currentItem) {
@@ -146,7 +161,8 @@ const AdminPanel = () => {
     setCurrentItem(item);
     setFormData({
       ...item,
-      date: item.date?.toDate ? item.date.toDate() : item.date
+      date: item.date?.toDate ? item.date.toDate() : item.date,
+      scheduledTime: item.scheduledTime?.toDate ? item.scheduledTime.toDate() : item.scheduledTime
     });
     setShowModal(true);
   };
@@ -158,8 +174,10 @@ const AdminPanel = () => {
         await deleteDoc(doc(db, type, id));
         if (type === 'events') {
           setEvents(events.filter(e => e.id !== id));
-        } else {
+        } else if (type === 'products') {
           setProducts(products.filter(p => p.id !== id));
+        } else if (type === 'streams') {
+          setStreams(streams.filter(s => s.id !== id));
         }
       } catch (error) {
         setError('Error eliminando el elemento');
@@ -225,64 +243,154 @@ const AdminPanel = () => {
       {success && <Alert variant="success">{success}</Alert>}
 
       <Tabs activeKey={activeTab} onSelect={setActiveTab} className="mb-4">
-        {Object.entries(collections).map(([key, config]) => (
-          <Tab key={key} eventKey={key} title={key === 'events' ? 'Eventos' : 'Productos'}>
-            <Button 
-              variant="success" 
-              className="my-4"
-              onClick={() => {
-                setCurrentItem(null);
-                setShowModal(true);
-              }}
-            >
-              Crear Nuevo {key === 'events' ? 'Evento' : 'Producto'}
-            </Button>
+        <Tab eventKey="events" title="Eventos">
+          <Button 
+            variant="success" 
+            className="my-4"
+            onClick={() => {
+              setCurrentItem(null);
+              setShowModal(true);
+            }}
+          >
+            Crear Nuevo Evento
+          </Button>
 
-            <Row xs={1} md={2} lg={3} className="g-4">
-              {(key === 'events' ? events : products).map(item => (
-                <Col key={item.id}>
-                  <div className="card h-100 shadow-sm">
-                    <img 
-                      src={item.image || 'https://via.placeholder.com/200x200'} 
-                      alt={item.title || item.name}
-                      className="card-img-top"
-                      style={{ height: '200px', objectFit: 'cover' }}
-                    />
-                    <div className="card-body">
-                      <h5 className="card-title">{item.title || item.name}</h5>
-                      <p className="card-text text-muted small">
-                        {item.description?.substring(0, 100) || 'Sin descripción'}...
-                      </p>
-                      <div className="d-flex gap-2">
-                        <Button 
-                          variant="outline-primary" 
-                          size="sm"
-                          onClick={() => handleEdit(item, key)}
-                        >
-                          Editar
-                        </Button>
-                        <Button 
-                          variant="outline-danger" 
-                          size="sm"
-                          onClick={() => handleDelete(item.id, key)}
-                        >
-                          Eliminar
-                        </Button>
-                      </div>
+          <Row xs={1} md={2} lg={3} className="g-4">
+            {events.map(item => (
+              <Col key={item.id}>
+                <div className="card h-100 shadow-sm">
+                  <img 
+                    src={item.image || 'https://via.placeholder.com/200x200'} 
+                    alt={item.title}
+                    className="card-img-top"
+                    style={{ height: '200px', objectFit: 'cover' }}
+                  />
+                  <div className="card-body">
+                    <h5 className="card-title">{item.title}</h5>
+                    <p className="card-text text-muted small">
+                      {item.description?.substring(0, 100) || 'Sin descripción'}...
+                    </p>
+                    <div className="d-flex gap-2">
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm"
+                        onClick={() => handleEdit(item, 'events')}
+                      >
+                        Editar
+                      </Button>
+                      <Button 
+                        variant="outline-danger" 
+                        size="sm"
+                        onClick={() => handleDelete(item.id, 'events')}
+                      >
+                        Eliminar
+                      </Button>
                     </div>
                   </div>
-                </Col>
-              ))}
-            </Row>
-          </Tab>
-        ))}
+                </div>
+              </Col>
+            ))}
+          </Row>
+        </Tab>
+        <Tab eventKey="products" title="Productos">
+          <Button 
+            variant="success" 
+            className="my-4"
+            onClick={() => {
+              setCurrentItem(null);
+              setShowModal(true);
+            }}
+          >
+            Crear Nuevo Producto
+          </Button>
+
+          <Row xs={1} md={2} lg={3} className="g-4">
+            {products.map(item => (
+              <Col key={item.id}>
+                <div className="card h-100 shadow-sm">
+                  <img 
+                    src={item.image || 'https://via.placeholder.com/200x200'} 
+                    alt={item.name}
+                    className="card-img-top"
+                    style={{ height: '200px', objectFit: 'cover' }}
+                  />
+                  <div className="card-body">
+                    <h5 className="card-title">{item.name}</h5>
+                    <p className="card-text text-muted small">
+                      {item.description?.substring(0, 100) || 'Sin descripción'}...
+                    </p>
+                    <div className="d-flex gap-2">
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm"
+                        onClick={() => handleEdit(item, 'products')}
+                      >
+                        Editar
+                      </Button>
+                      <Button 
+                        variant="outline-danger" 
+                        size="sm"
+                        onClick={() => handleDelete(item.id, 'products')}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Col>
+            ))}
+          </Row>
+        </Tab>
+        <Tab eventKey="streams" title="Streams">
+          <Button 
+            variant="success" 
+            className="my-4"
+            onClick={() => {
+              setCurrentItem(null);
+              setShowModal(true);
+            }}
+          >
+            Crear Nuevo Stream
+          </Button>
+
+          <Row xs={1} md={2} lg={3} className="g-4">
+            {streams.map(item => (
+              <Col key={item.id}>
+                <div className="card h-100 shadow-sm">
+                  <div className="card-body">
+                    <h5 className="card-title">{item.title}</h5>
+                    <p className="card-text text-muted small">
+                      {item.description?.substring(0, 100) || 'Sin descripción'}...
+                    </p>
+                    <div className="d-flex gap-2">
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm"
+                        onClick={() => handleEdit(item, 'streams')}
+                      >
+                        Editar
+                      </Button>
+                      <Button 
+                        variant="outline-danger" 
+                        size="sm"
+                        onClick={() => handleDelete(item.id, 'streams')}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Col>
+            ))}
+          </Row>
+        </Tab>
       </Tabs>
 
       {/* Modal de edición */}
       <Modal show={showModal} onHide={resetForm} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>
-            {currentItem ? 'Editar' : 'Crear Nuevo'} {activeTab === 'events' ? 'Evento' : 'Producto'}
+            {currentItem ? 'Editar' : 'Crear Nuevo'} {activeTab === 'events' ? 'Evento' : activeTab === 'products' ? 'Producto' : 'Stream'}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -294,25 +402,21 @@ const AdminPanel = () => {
                   {collections[activeTab].required.includes(field) && ' *'}
                 </Form.Label>
                 
-                {field === 'date' ? (
+                {field === 'date' || field === 'scheduledTime' ? (
                   <DatePicker
-                    selected={formData.date || new Date()}
-                    onChange={date => setFormData({...formData, date})}
+                    selected={formData[field] || new Date()}
+                    onChange={date => setFormData({...formData, [field]: date})}
                     showTimeSelect
                     dateFormat="Pp"
                     className="form-control"
                   />
-                ) : field === 'image' ? (
-                  <>
-                    <Form.Control
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => 
-                        setFormData({...formData, imageFile: e.target.files[0]})
-                      }
-                    />
-                    {uploading && <small className="text-muted">Subiendo imagen...</small>}
-                  </>
+                ) : field === 'isLive' ? (
+                  <Form.Check
+                    type="switch"
+                    label="En Vivo"
+                    checked={formData[field] || false}
+                    onChange={(e) => setFormData({...formData, [field]: e.target.checked})}
+                  />
                 ) : (
                   <Form.Control
                     type={field === 'price' ? 'number' : 'text'}
@@ -321,6 +425,7 @@ const AdminPanel = () => {
                       setFormData({...formData, [field]: e.target.value})
                     }
                     required={collections[activeTab].required.includes(field)}
+                    placeholder={field === 'image' ? 'https://ejemplo.com/imagen.jpg' : ''}
                   />
                 )}
               </Form.Group>
@@ -329,7 +434,7 @@ const AdminPanel = () => {
               <Button variant="secondary" onClick={resetForm}>
                 Cancelar
               </Button>
-              <Button variant="primary" type="submit" disabled={uploading}>
+              <Button variant="primary" type="submit">
                 {currentItem ? 'Actualizar' : 'Crear'}
               </Button>
             </div>

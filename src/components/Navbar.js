@@ -1,6 +1,5 @@
 import { Navbar, Container, Nav } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { animateScroll as scroll } from 'react-scroll';
 
 const CustomNavbar = () => {
   return (
@@ -12,19 +11,13 @@ const CustomNavbar = () => {
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="ms-auto">
-            <Nav.Link 
-              as={Link} 
-              to="/" 
-              className="mx-3 nav-hover"
-              onClick={() => scroll.scrollToTop()}
-            >
+            <Nav.Link as={Link} to="/" className="mx-3 nav-hover">
               Inicio
             </Nav.Link>
-            <Nav.Link 
-              as={Link} 
-              to="/catalogo" 
-              className="mx-3 nav-hover"
-            >
+            <Nav.Link as={Link} to="/live" className="mx-3 nav-hover">
+  En Vivo
+</Nav.Link>
+            <Nav.Link as={Link} to="/catalogo" className="mx-3 nav-hover">
               Catálogo
             </Nav.Link>
           </Nav>
